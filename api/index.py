@@ -1,7 +1,5 @@
 # -*- codeing = utf-8 -*-
-# @Time : 2021/02/08 9:05 上午
-# @Author : Zfour
-# @File : spyder1.py
+# @Author : noionion
 # @Software : PyCharm
 
 import leancloud
@@ -10,9 +8,10 @@ import json
 import datetime
 import os
 
+from leancloud import user
+
 def getdata():
-    list = ['title','time','link','author','headimg']
-    list_user = ['frindname','friendlink','firendimg','error']
+    list = ['title','created','updated','link','author','avatar']
     # Verify key
     leancloud.init(os.environ["LEANCLOUD_ID"], os.environ["LEANCLOUD_KEY"])
 
@@ -29,7 +28,7 @@ def getdata():
     query.limit(1000)
 
     # Choose class
-    query.select('title','time','link','author','headimg','createdAt')
+    query.select('title','time','updated','link','author','headimg','createdAt')
 
     # Execute the query, returning result
     query_list = query.find()
@@ -42,28 +41,36 @@ def getdata():
 
 
     # Result to arr
-    datalist=[]
-    for i in query_list:
-        itemlist=[]
-        for item in list:
-            itemlist.append(i.get(item))
-        update_time = i.get('createdAt')
-        itemlist.append(update_time.strftime('%Y-%m-%d %H:%M:%S'))
-        datalist.append(itemlist)
+    api_json = {}
+    friends_num = len(query_list_user)
+    active_num = len(set([item.get('author') for item in query_list]))
+    error_num = len([friend for friend in query_list_user if friend.get('error') == 'true'])
+    article_num = len(query_list)
+    last_updated_time = max([item.get('createdAt').strftime('%Y-%m-%d %H:%M:%S') for item in query_list])
+    
+    api_json['statistical_data'] = {
+        'friends_num': friends_num,
+        'active_num': active_num,
+        'error_num': error_num,
+        'article_num': article_num,
+        'last_updated_time': last_updated_time
+    }
+    
+    article_data = []
+    for item in query_list:
+        itemlist = {}
+        for elem in list:
+            if elem == 'created':
+                itemlist[elem] = item.get('time')
+            elif elem == 'avatar':
+                itemlist[elem] = item.get('headimg')
+            else:
+                itemlist[elem] = item.get(elem)
+        article_data.append(itemlist)
+    api_json['article_data'] = article_data
 
+    return api_json
 
-    datalist_user =[]
-    for j in  query_list_user:
-        itemlist_user=[]
-        for item2 in list_user:
-
-            itemlist_user.append(j.get(item2))
-        datalist_user.append(itemlist_user)
-    total_data = []
-    total_data.append(datalist_user)
-    total_data.append(datalist)
-    return total_data
-    # Api handler
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         data = getdata()
@@ -71,6 +78,5 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
+        self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
         return
-print(getdata())
